@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Contact Lens Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #21262d;
+    --muted:     #484f58;
+    --text:      #c9d1d9;
+    --bright:    #e6edf3;
+    --accent:    #388bfd;
+    --amber:     #d29922;
+    --danger:    #f85149;
+    --track:     #21262d;
+    --radius:    12px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+    gap: 24px;
+  }
+
+  header {
+    text-align: center;
+    padding-top: 8px;
+  }
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* ── Arc SVG ── */
+  .arc-wrap {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    flex-shrink: 0;
+  }
+  .arc-wrap svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .arc-track { fill: none; stroke: var(--track); stroke-width: 10; }
+  .arc-fill  { fill: none; stroke-width: 10; stroke-linecap: round;
+               transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease; }
+
+  .arc-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+  .arc-days {
+    font-family: 'Space Mono', monospace;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--bright);
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+  .arc-label {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Session clock ── */
+  .session-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .session-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .session-dot.live {
+    background: #3fb950;
+    box-shadow: 0 0 6px #3fb950aa;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  #sessionClock { color: var(--text); }
+
+  /* ── Stats card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    color: var(--bright);
+  }
+  .divider {
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Buttons ── */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .btn {
+    flex: 1;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.01em;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-stop {
+    background: #21262d;
+    color: var(--danger);
+    border: 1px solid #30363d;
+  }
+  .btn-new {
+    background: #21262d;
+    color: var(--text);
+    border: 1px solid #30363d;
+    font-size: 13px;
+  }
+
+  /* ── Alert banner ── */
+  .alert {
+    display: none;
+    width: 100%;
+    max-width: 340px;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .alert.warn {
+    background: #2d2200;
+    border: 1px solid #7d5a00;
+    color: var(--amber);
+    display: block;
+  }
+  .alert.done {
+    background: #200d0d;
+    border: 1px solid #6e1a1a;
+    color: var(--danger);
+    display: block;
+  }
+
+  /* ── History ── */
+  details {
+    width: 100%;
+    max-width: 340px;
+  }
+  summary {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  summary::before { content: '▸'; font-size: 10px; }
+  details[open] summary::before { content: '▾'; }
+  .history-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .history-item:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Contact Lens Tracker</h1>
+</header>
+
+<!-- Arc progress -->
+<div class="arc-wrap" id="arcWrap">
+  <svg viewBox="0 0 220 220">
+    <circle class="arc-track" cx="110" cy="110" r="98"/>
+    <circle class="arc-fill" id="arcFill" cx="110" cy="110" r="98"/>
+  </svg>
+  <div class="arc-center">
+    <div class="arc-days" id="arcDays">0</div>
+    <div class="arc-label">of 30 days</div>
+  </div>
+</div>
+
+<!-- Live session indicator -->
+<div class="session-row">
+  <div class="session-dot" id="sessionDot"></div>
+  <span id="sessionLabel">Not wearing</span>
+  &nbsp;
+  <span id="sessionClock"></span>
+</div>
+
+<!-- Alert -->
+<div class="alert" id="alertBanner"></div>
+
+<!-- Action buttons -->
+<div class="btn-row">
+  <button class="btn btn-primary" id="btnWear">Put In</button>
+  <button class="btn btn-stop"    id="btnStop" disabled>Take Out</button>
+</div>
+<div class="btn-row">
+  <button class="btn btn-new" id="btnNew">New Pair</button>
+</div>
+
+<!-- Stats -->
+<div class="card">
+  <div class="stat-row">
+    <span class="stat-label">Total wear time</span>
+    <span class="stat-value" id="statTotal">0h 0m</span>
+  </div>
+  <div class="divider"></div>
+  <div class="stat-row">
+    <span class="stat-label">Days elapsed</span>
+    <span class="stat-value" id="statDays">0.0</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Pair opened</span>
+    <span class="stat-value" id="statOpened">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Discard by</span>
+    <span class="stat-value" id="statDiscard">—</span>
+  </div>
+</div>
+
+<!-- Session history -->
+<details>
+  <summary>Session history</summary>
+  <div class="history-list" id="historyList"></div>
+</details>
+
+<script>
+// ── Constants ──────────────────────────────────────────────
+const LIMIT_HOURS = 30 * 24; // 720 hours = 30 days of wear time
+const WARN_HOURS  = LIMIT_HOURS * 0.85; // warn at 85%
+const STORAGE_KEY = 'contacts_v1';
+const R = 98;
+const CIRC = 2 * Math.PI * R;
+
+// ── State ──────────────────────────────────────────────────
+let state = loadState();
+let tickInterval = null;
+
+// ── Persistence ────────────────────────────────────────────
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return freshState();
+}
+
+function freshState() {
+  return {
+    openedAt: Date.now(),
+    totalMs: 0,
+    sessionStart: null,
+    sessions: []
+  };
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ── Time helpers ───────────────────────────────────────────
+function fmtHM(ms) {
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h ${m}m`;
+}
+
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function fmtDateTime(ts) {
+  return new Date(ts).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+function liveMs() {
+  if (!state.sessionStart) return 0;
+  return Date.now() - state.sessionStart;
+}
+
+function totalMs() {
+  return state.totalMs + liveMs();
+}
+
+// ── Arc rendering ──────────────────────────────────────────
+const arcFill = document.getElementById('arcFill');
+const arcDays  = document.getElementById('arcDays');
+
+function renderArc(fraction) {
+  const clamped = Math.min(fraction, 1);
+  const offset  = CIRC * (1 - clamped);
+  arcFill.style.strokeDasharray  = CIRC;
+  arcFill.style.strokeDashoffset = offset;
+
+  const pct = fraction * 100;
+  let color = 'var(--accent)';
+  if (pct >= 100)      color = 'var(--danger)';
+  else if (pct >= 85)  color = 'var(--amber)';
+  arcFill.style.stroke = color;
+
+  const days = (totalMs() / (1000 * 3600 * 24)).toFixed(1);
+  arcDays.textContent = Math.floor(parseFloat(days));
+}
+
+// ── UI update ──────────────────────────────────────────────
+function render() {
+  const ms   = totalMs();
+  const hrs  = ms / 3600000;
+  const frac = hrs / LIMIT_HOURS;
+  const days = hrs / 24;
+
+  renderArc(frac);
+
+  // Stats
+  document.getElementById('statTotal').textContent   = fmtHM(ms);
+  document.getElementById('statDays').textContent    = days.toFixed(1);
+  document.getElementById('statOpened').textContent  = fmtDate(state.openedAt);
+
+  const discardTs = state.openedAt + LIMIT_HOURS * 3600000;
+  document.getElementById('statDiscard').textContent = fmtDate(discardTs);
+
+  // Session clock
+  const dot   = document.getElementById('sessionDot');
+  const label = document.getElementById('sessionLabel');
+  const clock = document.getElementById('sessionClock');
+
+  if (state.sessionStart) {
+    dot.classList.add('live');
+    label.textContent = 'Wearing';
+    const live = liveMs();
+    const lh = Math.floor(live / 3600000);
+    const lm = Math.floor((live % 3600000) / 60000);
+    const ls = Math.floor((live % 60000) / 1000);
+    clock.textContent = `${String(lh).padStart(2,'0')}:${String(lm).padStart(2,'0')}:${String(ls).padStart(2,'0')}`;
+  } else {
+    dot.classList.remove('live');
+    label.textContent = 'Not wearing';
+    clock.textContent = '';
+  }
+
+  // Buttons
+  document.getElementById('btnWear').disabled = !!state.sessionStart;
+  document.getElementById('btnStop').disabled = !state.sessionStart;
+
+  // Alert
+  const banner = document.getElementById('alertBanner');
+  if (hrs >= LIMIT_HOURS) {
+    banner.className = 'alert done';
+    banner.textContent = '⚠️ 30 days reached — discard this pair and open a new one.';
+  } else if (hrs >= WARN_HOURS) {
+    const remaining = Math.ceil(LIMIT_HOURS - hrs);
+    banner.className = 'alert warn';
+    banner.textContent = `${remaining}h of wear time remaining on this pair.`;
+  } else {
+    banner.className = 'alert';
+    banner.textContent = '';
+  }
+
+  // History
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+  const sessions = [...state.sessions].reverse().slice(0, 20);
+  for (const s of sessions) {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = `<span>${fmtDateTime(s.start)}</span><span>${fmtHM(s.ms)}</span>`;
+    list.appendChild(el);
+  }
+  if (sessions.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">No sessions yet</div>';
+  }
+}
+
+// ── Actions ────────────────────────────────────────────────
+document.getElementById('btnWear').addEventListener('click', () => {
+  state.sessionStart = Date.now();
+  saveState();
+  startTick();
+  render();
+});
+
+document.getElementById('btnStop').addEventListener('click', () => {
+  if (!state.sessionStart) return;
+  const ms = Date.now() - state.sessionStart;
+  state.sessions.push({ start: state.sessionStart, ms });
+  state.totalMs += ms;
+  state.sessionStart = null;
+  saveState();
+  render();
+});
+
+document.getElementById('btnNew').addEventListener('click', () => {
+  const confirmed = confirm('Start a new pair? This will reset all wear time.');
+  if (!confirmed) return;
+  // If currently wearing, close session first
+  if (state.sessionStart) {
+    const ms = Date.now() - state.sessionStart;
+    state.sessions.push({ start: state.sessionStart, ms });
+    state.totalMs += ms;
+    state.sessionStart = null;
+  }
+  state = freshState();
+  saveState();
+  render();
+});
+
+// ── Tick ──────────────────────────────────────────────────
+function startTick() {
+  clearInterval(tickInterval);
+  tickInterval = setInterval(render, 1000);
+}
+
+// On load, if a session was in progress (e.g. app was closed while wearing),
+// keep it live — sessionStart is preserved in localStorage.
+if (state.sessionStart) {
+  startTick();
+}
+
+render();
+</script>
+</body>
+</html>
