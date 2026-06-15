@@ -79,11 +79,25 @@
   }
   .arc-days {
     font-family: 'Space Mono', monospace;
-    font-size: 48px;
+    font-size: 44px;
     font-weight: 700;
     color: var(--bright);
     line-height: 1;
     letter-spacing: -2px;
+  }
+  .arc-pct-sign {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--muted);
+    align-self: flex-start;
+    margin-top: 10px;
+    margin-left: 2px;
+  }
+  .arc-num-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1px;
   }
   .arc-label {
     font-size: 11px;
@@ -262,8 +276,11 @@
     <circle class="arc-fill" id="arcFill" cx="110" cy="110" r="98"/>
   </svg>
   <div class="arc-center">
-    <div class="arc-days" id="arcDays">0</div>
-    <div class="arc-label">of 30 days</div>
+    <div class="arc-num-row">
+      <div class="arc-days" id="arcDays">100</div>
+      <div class="arc-pct-sign">%</div>
+    </div>
+    <div class="arc-label">life remaining</div>
   </div>
 </div>
 
@@ -295,8 +312,8 @@
   </div>
   <div class="divider"></div>
   <div class="stat-row">
-    <span class="stat-label">Days elapsed</span>
-    <span class="stat-value" id="statDays">0.0</span>
+    <span class="stat-label">Hours used</span>
+    <span class="stat-value" id="statDays">0.0 / 720</span>
   </div>
   <div class="stat-row">
     <span class="stat-label">Pair opened</span>
@@ -378,19 +395,21 @@ const arcFill = document.getElementById('arcFill');
 const arcDays  = document.getElementById('arcDays');
 
 function renderArc(fraction) {
-  const clamped = Math.min(fraction, 1);
-  const offset  = CIRC * (1 - clamped);
+  // fraction = used portion (0→1). Arc shows REMAINING life, draining down.
+  const remaining = Math.max(0, 1 - fraction);
+  const clamped   = Math.min(remaining, 1);
+  const offset    = CIRC * (1 - clamped);
   arcFill.style.strokeDasharray  = CIRC;
   arcFill.style.strokeDashoffset = offset;
 
-  const pct = fraction * 100;
+  const usedPct = fraction * 100;
   let color = 'var(--accent)';
-  if (pct >= 100)      color = 'var(--danger)';
-  else if (pct >= 85)  color = 'var(--amber)';
+  if (usedPct >= 100)     color = 'var(--danger)';
+  else if (usedPct >= 85) color = 'var(--amber)';
   arcFill.style.stroke = color;
 
-  const days = (totalMs() / (1000 * 3600 * 24)).toFixed(1);
-  arcDays.textContent = Math.floor(parseFloat(days));
+  const remainPct = Math.max(0, Math.round(100 - usedPct));
+  arcDays.textContent = remainPct;
 }
 
 // ── UI update ──────────────────────────────────────────────
@@ -404,7 +423,7 @@ function render() {
 
   // Stats
   document.getElementById('statTotal').textContent   = fmtHM(ms);
-  document.getElementById('statDays').textContent    = days.toFixed(1);
+  document.getElementById('statDays').textContent    = `${hrs.toFixed(1)} / 720`;
   document.getElementById('statOpened').textContent  = fmtDate(state.openedAt);
 
   const discardTs = state.openedAt + LIMIT_HOURS * 3600000;
